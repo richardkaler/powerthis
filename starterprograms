@@ -1,0 +1,116 @@
+#This is a helpful script to get someone going after first installing a Windows server - and you could also use this on a regular edition of Windows - but I had servers in mind when I wrote it
+#... And that's the reason why I included stuff like Firefox, given it is one of the first things I install on a Windows server - which are morel likely to only have Edge or Inernet Explorer installed 
+#Includes: VScode, Chocolatey, Firefox, and DFS replication modules - though that is just something I included on here to impress a potential company I'd like to work for 
+
+#NOTE: This script must be run by a user with admin privileges 
+Write-Host "Note - if the .NET framework is not first intalled, a reboot will be required at some point. Read prompt"
+Write-Host "Installing the following packages, programs and features:"
+Write-Host "DFS Replication feature for folder replication across multiple servers and domains"
+Write-Host "Chocolatey - for open source package management"
+Write-Host "Firefox"
+Write-Host "VScode for scripting"
+
+# Set execution policy to allow script execution
+Write-Host "Setting execution policy to allow script execution"
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
+# Check if Chocolatey is already installed
+if (Test-Path $env:ProgramData\chocolatey\choco.exe) {
+    Write-Host "Chocolatey is already installed"
+} else {
+    # Attempt to install Chocolatey
+    Write-Host "Installing Chocolatey"
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; 
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+    # Check if Chocolatey installation was successful
+    if (Test-Path C:\ProgramData\chocolatey) {
+        Write-Host "Installed Chocolatey"
+    } else {
+        Write-Host "Failed to install Chocolatey"
+    }
+}
+
+# Define the Chocolatey packages you want to install
+$chocolateyPackages = @("firefox", "vscode")
+
+# Function to check if a Chocolatey package is installed
+Function Test-ChocolateyPackage($packageName) {
+    $chocoInfo = choco info $packageName --local-only
+    return $chocoInfo -match "Status: FullyInstalled"
+}
+
+# Function to install a Chocolatey package
+Function Install-ChocolateyPackage($packageName) {
+    Write-Host "Attempting to install $packageName via Chocolatey"
+    if (choco install $packageName --force -y) {
+        Write-Host "Successfully installed $packageName"
+    } else {
+        Write-Host "Failed to install $packageName"
+    }
+}
+
+# Check and install Chocolatey packages
+Write-Host "Attempting to install Chocolatey packages:"
+
+foreach ($package in $chocolateyPackages) {
+    if (Test-ChocolateyPackage $package) {
+        Write-Host "Package $package is already installed by Chocolatey"
+    } else {
+        Write-Host "Attempting to install $package via Chocolatey now"
+        choco install $package --force -y
+        
+    }
+}
+
+Write-Host "Attempting to install DFS replication PowerShell feature for future file system integration"
+
+# Check if DFS Replication feature is installed
+
+Write-Host "Attempting to install PSD Resources PowerShell feature"
+$psdModuleInstalled = $false
+try {
+    Install-Module 'PSDscResources' -Force -Scope CurrentUser -Verbose
+    $psdModuleInstalled = $true
+    Write-Host "Installed PSD resource module required for future upgrades"
+} catch {
+    if ($_.Exception.Message -like "*Hash for package*does not match hash provided from the server*") {
+        Write-Host "The hash of the downloaded package does not match the expected hash. This may be due to network issues or changes on the server."
+    } else {
+        Write-Host "Failed to install PSD Module. Error: $($_.Exception.Message)"
+    }
+}
+
+
+$dfsReplicationInstalled = Get-WindowsFeature -Name FS-DFS-Replication | Select-Object -ExpandProperty Installed
+
+# Check if DFS replication feature is installed
+if (Get-WindowsFeature -Name FS-DFS-Replication | Select-Object -ExpandProperty Installed) {
+    Write-Host "DFS replication module is already installed"
+}
+else {
+    Write-Host "DFS replication module is not installed"
+    Write-Host "Installing now..."
+    Install-WindowsFeature -Name FS-DFS-Replication -IncludeManagementTools -Restart
+    if ($?) {
+        Write-Host "DFS feature successfully installed"
+    }
+    else {
+        Write-Host "Failed to install DFS replication feature"
+    }
+}
+if (Get-WindowsFeature -Name FS-DFS-Namespace  | Select-Object -ExpandProperty Installed) {
+Write-Host "DFS namespace module is already installed" 
+} 
+else {
+Write-Host "DFS namespace not yet installed" 
+Write-Host "Installing now ..." 
+Install-WindowsFeature -Name FS-DFS-Namespace -IncludeManagementTools -Restart
+    if ($?) {
+        Write-Host "DFS Namespace successfully installed"
+    }
+    else {
+        Write-Host "Failed to install DFS Namespace feature"
+    }
+}
+
